@@ -1,5 +1,4 @@
-// All card parsing and rule logic lives here.
-// No game state, no I/O - just functions over card strings.
+// Card parsing and rule logic
 public class CardRules {
 
     // Returns the color prefix of a card ("R", "Y", "G", "B"), or "" for wilds.
@@ -37,9 +36,7 @@ public class CardRules {
         if (r.equals("WILD") || r.equals("WILD_DRAW_FOUR"))           return 50;
         return 0;
     }
-
-    // Returns true if playing card onto upCard is legal given the active calledColor.
-    // This is the single source of truth for legality - used by both the turn loop and bots.
+    // Legality checking and truth validity, used by both the turn loop and bots.
     public static boolean isLegal(String card, String upCard, String calledColor) {
         if (card.startsWith("W"))                                              return true;
         if (color(card).equals(color(upCard)))                                 return true;
