@@ -1,50 +1,52 @@
 # Extension Readiness
 
-## Which extension would your design support best?
+## Which extension would fit this design best?
 
-**A replay log** is the most ready extension. The structure is already in place: `GameState` has a `replayLog` field (an `ArrayList<String>`) and a `log(String event)` method. Wiring it in requires adding `state.log(...)` calls in `Main.playTurn()` at the points where things happen, and printing or saving the log at the end of each game.
+The easiest extension to add right now would probably be a replay log. The structure for it already exists inside `GameState` through the `replayLog` field and the `log(String event)` method.
 
-**Adding a new card effect** is the second most ready. The design makes it a small, contained change rather than a search through one large method.
+To make it work fully, I would mainly just need to add `state.log(...)` calls inside `Main.playTurn()` whenever something important happens, like:
+- a player draws a card
+- a player plays a card
+- a wild color is called
+- a player wins the game
 
-## Where would each change be implemented?
+At the end of the game, the log could either be printed to the console or written to a file.
 
-### Replay log
+Another extension that would fit the current structure fairly well is adding a new card effect. Since rule logic is now separated better than before, adding a new effect would only require a few small edits instead of modifying one huge game loop.
 
-1. In `Main.playTurn()`, add `state.log(...)` at the four meaningful events:
-   - after a card is drawn: `state.log(name + " drew " + drawn);`
-   - after a card is played: `state.log(name + " played " + card);`
-   - after a color is called: `state.log(name + " called " + state.calledColor);`
-   - after a win: `state.log(name + " won with " + points + " points");`
-2. In `Main.playGame()` or `GameView`, print or write `state.replayLog` at game end.
-3. Optionally write it to a file by adding a `saveReplayLog(String filename)` method to `GameState`.
+---
 
-No other files need changing. The log is isolated to `GameState` and the call sites in `Main`.
+## Example extension: new card effect
 
-### New card effect (example: Swap Hands)
+For example, if I wanted to add a `"SWAP_HANDS"` card effect:
 
-1. `CardRules.rank()` — add a new return value, e.g. `"SWAP_HANDS"`.
-2. `CardRules.points()` — add a score value for the new card.
-3. `CardRules.isLegal()` — add a legality condition if needed (most action cards need none beyond color/rank match).
-4. `Main.applyCardEffect()` — add one `else if` branch for `"SWAP_HANDS"` that swaps the current player's hand with the next player's hand.
-5. `GameView` — add a `showSwapHands(String p1, String p2)` print method.
+1. Add a new rank inside `CardRules.rank()`
+2. Add its score value inside `CardRules.points()`
+3. Update legality checks if needed
+4. Add a new branch inside `Main.applyCardEffect()`
+5. Add a small output method inside `GameView`
 
-Before this refactor, adding a card effect meant editing the 200-line game loop and finding the right copy of the legality check. Now it is five small, isolated edits in five focused locations.
+Before refactoring, adding a new effect would require searching through a very large `Main` class and duplicated legality logic. Now the changes are much smaller and more isolated.
 
-### Smarter bot strategy
+---
 
-Currently `BotStrategy` is a class with static methods. To support multiple strategies without changing `Main`:
+## Example extension: smarter bots
 
-1. Define a `BotStrategy` interface with `int chooseCard(...)` and `String chooseColor(...)`.
-2. Rename the current class to `BasicBotStrategy` implementing that interface.
-3. Store a `BotStrategy` instance per player in `GameState`.
-4. In `Main.playTurn()`, replace `BotStrategy.chooseCard(...)` with `state.getBotStrategy(state.currentPlayer).chooseCard(...)`.
+The current `BotStrategy` uses static methods, but the structure could still support multiple bot types fairly easily.
 
-This is a slightly larger change but `GameState` and `Main` are the only files that need touching.
+One possible improvement would be:
+- creating a `BotStrategy` interface
+- renaming the current implementation to something like `BasicBotStrategy`
+- storing one strategy per player inside `GameState`
 
-## What part of your design still makes change difficult?
+That would make it possible to add aggressive bots, defensive bots, or random bots without changing the main game loop very much.
 
-**Global state access.** `GameState` is better than loose static fields, but it is still a single shared object with public fields. `Main.applyCardEffect()` and `Main.playTurn()` access `state.currentPlayer`, `state.direction`, `state.hands`, and `state.deck` directly. A replay log can be added without touching this, but anything that needs to reason about state transitions from the outside (like a test that replays a recorded game) would still need to know the internal structure of `GameState`.
+---
 
-**The turn loop is not data.** A replay log stores strings, but replaying a game from a log would require re-parsing those strings back into actions. If replay fidelity matters, the log should store structured events (a small `TurnEvent` class with player, card, and type fields) rather than formatted strings. The current design makes adding the log easy but makes replaying from it harder.
+## What still makes future changes harder?
 
-**`applyCardEffect` is still conditional.** The if/else chain is easier to find and edit now, but it still requires editing existing code to add a new card type. A future step would be to replace it with a map from rank string to a functional effect, or to introduce a small effect interface that each card type implements.
+One remaining issue is that `GameState` fields are still accessed directly from `Main`. The state is much more organized than before, but parts of the game still depend on internal fields like `currentPlayer`, `direction`, `hands`, and `deck`.
+
+Another limitation is that `applyCardEffect()` is still an `if/else` chain. It is much cleaner now because it is isolated in one place, but adding completely new card behaviors would still require editing that method directly.
+
+The replay log also stores plain strings instead of structured events. That makes logging easy, but replaying an exact game from the log would be harder because the strings would need to be parsed again later.
