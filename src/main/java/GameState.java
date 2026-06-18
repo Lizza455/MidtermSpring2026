@@ -12,6 +12,7 @@ public class GameState {
     int direction = 1;
     String upCard = "";
     String calledColor = "";
+    int lastRoundPoints = 0;
     Random random;
 
     // Extension hook: each element is one logged turn event.

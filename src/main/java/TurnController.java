@@ -83,6 +83,7 @@ public class TurnController {
 
         if (hand.isEmpty()) {
             int points = state.tallyPoints(state.currentPlayer);
+            state.lastRoundPoints = points;
             state.scores[state.currentPlayer] += points;
             GameView.showWin(name, points);
             log("GAME_END winner=" + name + " points=" + points);

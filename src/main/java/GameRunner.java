@@ -1,3 +1,4 @@
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -10,10 +11,12 @@ public class GameRunner {
         this.turnController = new TurnController(state);
     }
 
-    public void playGame() {
+    public GameResult playGame() {
+        LocalDateTime startedAt = LocalDateTime.now();
         state.buildDeck();
         Collections.shuffle(state.deck, state.random);
         state.discard.clear();
+        state.replayLog.clear();
         for (ArrayList<String> hand : state.hands) hand.clear();
 
         for (int i = 0; i < state.playerNames.size(); i++) {
@@ -31,14 +34,38 @@ public class GameRunner {
         state.currentPlayer = state.random.nextInt(state.playerNames.size());
         log("GAME_START firstPlayer=" + state.currentPlayerName() + " upCard=" + state.upCard);
 
-        int guard = 0;
-        while (guard < 300) {
-            guard++;
-            if (turnController.playTurn()) return;
+        int turnsPlayed = 0;
+        while (turnsPlayed < 300) {
+            turnsPlayed++;
+            int playerBeforeTurn = state.currentPlayer;
+            if (turnController.playTurn()) {
+                String winnerName = state.playerNames.get(playerBeforeTurn);
+                int pointsScored = state.lastRoundPoints;
+                return new GameResult(
+                        startedAt,
+                        LocalDateTime.now(),
+                        state.playerNames,
+                        state.scores,
+                        winnerName,
+                        pointsScored,
+                        1,
+                        turnsPlayed
+                );
+            }
         }
 
         log("GAME_END safetyLimitReached=true");
         GameView.showSafetyLimit();
+        return new GameResult(
+                startedAt,
+                LocalDateTime.now(),
+                state.playerNames,
+                state.scores,
+                "NO_WINNER",
+                0,
+                1,
+                turnsPlayed
+        );
     }
 
     private void log(String event) {
