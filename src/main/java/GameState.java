@@ -1,22 +1,46 @@
 import java.util.*;
 
-// All mutable game states kept in one place to make  the turn loop in Main easier to follow and extensions simpler to add.
+/**
+ * All mutable game state kept in one place.
+ * Supports multi-round play to a target score (default 500).
+ */
 public class GameState {
-    ArrayList<String> playerNames = new ArrayList<>();
+    // --- Player data ---
+    ArrayList<String> playerNames   = new ArrayList<>();
     ArrayList<Boolean> humanPlayers = new ArrayList<>();
     ArrayList<ArrayList<String>> hands = new ArrayList<>();
-    ArrayList<String> deck = new ArrayList<>();
+
+    // --- Card piles ---
+    ArrayList<String> deck    = new ArrayList<>();
     ArrayList<String> discard = new ArrayList<>();
+
+    // --- Scores (cumulative across rounds) ---
     int[] scores = new int[10];
+
+    // --- Turn state ---
     int currentPlayer = 0;
-    int direction = 1;
-    String upCard = "";
+    int direction     = 1;   // 1 = clockwise, -1 = counterclockwise
+    String upCard      = "";
     String calledColor = "";
+
+    // --- Round bookkeeping ---
     int lastRoundPoints = 0;
+    int roundsPlayed    = 0;
+
+    // --- Multi-round target ---
+    int targetScore = 500;
+
+    // --- UNO penalty tracking ---
+    // Index of the player who is currently at 1 card and has NOT yet been challenged.
+    // -1 means no player is in the pending-UNO state.
+    int unoCandidateIndex = -1;
+    // Whether the candidate already called UNO (announced it).
+    boolean unoCalled = false;
+
+    // --- RNG ---
     Random random;
 
-    // Extension hook: each element is one logged turn event.
-    // Call log() during playTurn to enable a full replay log feature.
+    // --- Replay log ---
     ArrayList<String> replayLog = new ArrayList<>();
 
     GameState(long seed) {
@@ -27,6 +51,7 @@ public class GameState {
         playerNames.clear();
         humanPlayers.clear();
         hands.clear();
+        Arrays.fill(scores, 0);
         if (human) {
             playerNames.add("You");
             humanPlayers.add(true);
@@ -39,25 +64,33 @@ public class GameState {
         }
     }
 
-    // Draws the top card, reshuffling the discard pile into the deck if needed.
+    /**
+     * Draws the top card from the deck.
+     * Reshuffles the discard pile back into the deck when empty.
+     */
     String draw() {
         if (deck.isEmpty()) {
             deck.addAll(discard);
             discard.clear();
             Collections.shuffle(deck, random);
         }
-        if (deck.isEmpty()) return "W"; // both piles exhausted — documented edge case
+        if (deck.isEmpty()) return "W"; // extremely rare edge case — documented
         return deck.remove(0);
     }
 
-    // Advances currentPlayer one step in the current direction.
+    /**
+     * Advances currentPlayer one step in the current direction,
+     * wrapping around at the ends.
+     */
     void next() {
         currentPlayer += direction;
         if (currentPlayer >= playerNames.size()) currentPlayer = 0;
         if (currentPlayer < 0) currentPlayer = playerNames.size() - 1;
     }
 
-    // Sums the card values in all hands except the winner's.
+    /**
+     * Sums the point value of all cards in every hand except the winner's.
+     */
     int tallyPoints(int winnerIndex) {
         int total = 0;
         for (int i = 0; i < hands.size(); i++) {
@@ -82,7 +115,22 @@ public class GameState {
         return hands.get(currentPlayer);
     }
 
-    // Builds the standard 108-card UNO deck into deck (unshuffled).
+    /**
+     * Returns the index of the first player who has reached or exceeded targetScore,
+     * or -1 if no one has won yet.
+     */
+    int overallWinnerIndex() {
+        for (int i = 0; i < playerNames.size(); i++) {
+            if (scores[i] >= targetScore) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Builds the standard 108-card UNO deck (unshuffled).
+     * 4 colors × (one 0, two each of 1–9, two Skip, two Reverse, two Draw Two)
+     * + 4 Wild + 4 Wild Draw Four = 108 cards total.
+     */
     void buildDeck() {
         deck.clear();
         String[] colors = {"R", "Y", "G", "B"};
@@ -96,7 +144,6 @@ public class GameState {
         for (int i = 0; i < 4; i++) { deck.add("W"); deck.add("W4"); }
     }
 
-    // Appends a turn event to the replay log.
     void log(String event) {
         replayLog.add(event);
     }
